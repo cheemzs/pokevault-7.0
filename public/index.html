@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokéVault</title>
+  <meta name="description" content="Search Pokémon card prices and track your investment portfolio." />
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- Supabase CDN (required for auth + database) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Chart.js for price history -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Header ────────────────────────────────────────────────── -->
+  <header id="site-header">
+    <div class="logo">
+      <span class="logo-mark">PokéVault</span>
+      <span class="logo-sub">API v2 · Live Prices</span>
+    </div>
+    <div class="header-right">
+      <span class="header-badge" id="fx-rate">USD/SGD: —</span>
+      <span id="premium-badge" class="premium-badge" style="display:none;">⭐ Pro</span>
+      <span class="header-user" id="username-display"></span>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </header>
+
+  <!-- ── Tab Nav ───────────────────────────────────────────────── -->
+  <nav class="tab-nav" role="tablist">
+    <button class="tab-btn active" id="nav-search" role="tab" aria-selected="true"
+            onclick="switchMainTab('search')">
+      <span class="tab-icon">🔍</span> Search
+    </button>
+    <button class="tab-btn" id="nav-portfolio" role="tab" aria-selected="false"
+            onclick="switchMainTab('portfolio')">
+      <span class="tab-icon">📊</span> Portfolio
+    </button>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SEARCH TAB
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="tab-search" class="main-tab">
+
+    <!-- Search Panel -->
+    <div class="search-panel">
+      <div class="search-row">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="search-input"
+            placeholder="199/165  ·  Charizard  ·  Pikachu ex  ·  001/165"
+            autocomplete="off" spellcheck="false" aria-label="Search Pokémon cards" />
+        </div>
+        <input type="text" id="set-input" placeholder="Set name (optional)"
+          autocomplete="off" spellcheck="false" aria-label="Filter by set name" />
+        <div class="lang-toggle" role="group" aria-label="Language">
+          <button class="lang-btn active" data-lang="english"  aria-pressed="true">🇺🇸 EN</button>
+          <button class="lang-btn"        data-lang="japanese" aria-pressed="false">🇯🇵 JP</button>
+        </div>
+        <div class="search-type-toggle" role="group" aria-label="Search type">
+          <button class="search-type-btn active" data-type="cards"  aria-pressed="true">Cards</button>
+          <button class="search-type-btn"        data-type="sealed" aria-pressed="false">Sealed</button>
+        </div>
+        <button class="btn-search" id="search-btn" aria-label="Search">Search</button>
+      </div>
+
+      <div class="hint-row" aria-label="Quick searches">
+        <span class="hint-chip" data-query="199/165"      title="Charizard ex from 151">199/165</span>
+        <span class="hint-chip" data-query="001/165"      title="Bulbasaur from 151">001/165</span>
+        <span class="hint-chip" data-query="025/165"      title="Pikachu from 151">025/165</span>
+        <span class="hint-chip" data-query="Charizard ex" title="Charizard ex cards">Charizard ex</span>
+        <span class="hint-chip" data-query="Umbreon"      title="Umbreon cards">Umbreon</span>
+        <span class="hint-chip" data-query="Mewtwo" data-lang="japanese" title="Mewtwo — JP prices">Mewtwo 🇯🇵</span>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar hidden" id="status-bar">
+      <div class="result-count" id="result-count"></div>
+      <div class="view-toggle" role="group" aria-label="View">
+        <button class="view-btn active" data-view="grid" aria-label="Grid view">⊞</button>
+        <button class="view-btn"        data-view="list" aria-label="List view">☰</button>
+      </div>
+    </div>
+
+    <!-- Welcome -->
+    <div id="welcome-state">
+      <div class="welcome-title">Search any card.<br/>By name or number.</div>
+      <p class="welcome-sub">
+        Type a card number like <strong>199/165</strong> to instantly find the
+        Charizard ex from 151. Or search by name, set, or rarity. Switch to Japanese for JP prices.
+        Found a card? Click <strong>+ Portfolio</strong> to track it as an investment.
+      </p>
+      <div class="example-searches" role="list">
+        <button class="example-chip" data-query="199/165"      role="listitem">199/165 — 151 Charizard</button>
+        <button class="example-chip" data-query="Pikachu ex"   role="listitem">Pikachu ex</button>
+        <button class="example-chip" data-query="Umbreon VMAX" role="listitem">Umbreon VMAX</button>
+        <button class="example-chip" data-query="001/165"      role="listitem">001/165 — Bulbasaur</button>
+        <button class="example-chip" data-query="Mewtwo" data-lang="japanese" role="listitem">Mewtwo 🇯🇵</button>
+        <button class="example-chip" data-query="Rayquaza"     role="listitem">Rayquaza</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" role="status" aria-live="polite">
+      <div class="spinner"></div>
+      <div class="loading-text">Fetching prices…</div>
+    </div>
+
+    <!-- Empty -->
+    <div id="empty-state" role="status" aria-live="polite">
+      <div class="state-icon">🔍</div>
+      <div class="state-title">No cards found</div>
+      <div class="state-desc">
+        Try a different card name or number. Card numbers like <code>199/165</code>
+        search directly by number — try adding the set name to narrow results.
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="error-state" role="alert" aria-live="assertive">
+      <div class="state-icon">⚠</div>
+      <div class="state-title">Something went wrong</div>
+      <div class="state-desc" id="error-msg"></div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-grid" class="hidden" role="list" aria-label="Search results"></div>
+
+  </div><!-- /tab-search -->
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       PORTFOLIO TAB
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="tab-portfolio" class="main-tab" style="display:none;">
+
+    <!-- Portfolio Metrics -->
+    <div class="pf-metrics">
+      <div class="pf-metric-card">
+        <div class="pf-metric-label">Total Cost</div>
+        <div class="pf-metric-val" id="pf-metric-cost">SGD $—</div>
+      </div>
+      <div class="pf-metric-card">
+        <div class="pf-metric-label">Current Value</div>
+        <div class="pf-metric-val accent" id="pf-metric-value">SGD $—</div>
+      </div>
+      <div class="pf-metric-card">
+        <div class="pf-metric-label">Unrealised P/L</div>
+        <div class="pf-metric-val" id="pf-metric-pl">—</div>
+      </div>
+      <div class="pf-metric-card">
+        <div class="pf-metric-label">ROI</div>
+        <div class="pf-metric-val" id="pf-metric-roi">—</div>
+      </div>
+      <div class="pf-metric-card">
+        <div class="pf-metric-label">History Window</div>
+        <div class="pf-metric-val" id="history-days-display" style="font-size:12px;">—</div>
+      </div>
+    </div>
+
+    <!-- Portfolio Add-Card Search -->
+    <div class="pf-search-panel">
+      <div class="pf-search-header">
+        <span class="pf-search-title">Add to Portfolio</span>
+        <span class="pf-search-sub">Search for a card or sealed product, then click + Portfolio</span>
+      </div>
+      <div class="pf-search-row">
+        <div class="search-wrap" style="flex:1;">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="pf-search-input"
+            placeholder="Search card name, number, or sealed product…"
+            autocomplete="off" spellcheck="false"
+            oninput="pfSearchDebounce()" onkeydown="if(event.key==='Enter')pfSearch()" />
+        </div>
+        <div class="lang-toggle" role="group">
+          <button class="lang-btn pf-lang-btn active" data-lang="english"  onclick="pfSetSearchLang('english')">🇺🇸 EN</button>
+          <button class="lang-btn pf-lang-btn"        data-lang="japanese" onclick="pfSetSearchLang('japanese')">🇯🇵 JP</button>
+        </div>
+        <div class="search-type-toggle">
+          <button class="search-type-btn active" id="pf-type-cards"  onclick="pfSetSearchType('cards')">Cards</button>
+          <button class="search-type-btn"        id="pf-type-sealed" onclick="pfSetSearchType('sealed')">Sealed</button>
+        </div>
+        <button class="btn-search" onclick="pfSearch()">Search</button>
+      </div>
+      <!-- Inline results for portfolio search -->
+      <div id="pf-search-results" style="display:none;"></div>
+    </div>
+
+    <!-- Portfolio Table -->
+    <div class="pf-table-wrap">
+      <div class="pf-table-header">
+        <span class="pf-table-title">Holdings</span>
+        <button class="btn-refresh-small" onclick="refreshPortfolioValues(false)" title="Refresh current values">↻ Refresh values</button>
+      </div>
+      <div class="table-scroll">
+        <table class="pf-table">
+          <thead>
+            <tr>
+              <th>Card / Product</th>
+              <th>Set</th>
+              <th>Condition</th>
+              <th>Qty</th>
+              <th>Cost (SGD)</th>
+              <th>Value (SGD)</th>
+              <th>P/L</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="portfolio-table">
+            <tr><td colspan="8"><div class="empty-state">No items in portfolio — search for a card above and click "+ Portfolio"</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /tab-portfolio -->
+
+</div><!-- /app -->
+
+<!-- ── Search Result Detail Modal ─────────────────────────────── -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)" role="dialog" aria-modal="true" aria-label="Card detail">
+  <div class="modal">
+    <div class="modal-close">
+      <button class="modal-close-btn" onclick="_destroyModal()" aria-label="Close">✕</button>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- ── Portfolio Add Modal ─────────────────────────────────────── -->
+<div id="portfolio-add-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Add to portfolio">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-close">
+      <button class="modal-close-btn" onclick="closePortfolioAddModal()" aria-label="Close">✕</button>
+    </div>
+    <div style="padding:0 28px 28px;">
+      <h2 style="font-family:var(--font-display);font-size:16px;font-weight:700;margin-bottom:20px;color:var(--text);">Add to Portfolio</h2>
+
+      <!-- Item preview -->
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:20px;padding:14px;background:var(--bg2);border-radius:var(--r-md);border:1px solid var(--border);">
+        <img id="pf-item-img" src="" alt="" style="width:44px;height:60px;object-fit:contain;border-radius:4px;display:none;" />
+        <div>
+          <div id="pf-item-name" style="font-weight:700;font-size:14px;color:var(--text);"></div>
+          <div id="pf-item-set" style="font-size:12px;color:var(--text3);font-family:var(--font-mono);margin-top:2px;"></div>
+          <div id="pf-item-type" style="font-size:11px;color:var(--accent);margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Purchase Price (SGD)</label>
+        <input type="number" id="pf-purchase-price" class="form-input" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Quantity</label>
+        <input type="number" id="pf-quantity" class="form-input" value="1" min="1" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Condition / Grade</label>
+        <select id="pf-condition" class="form-input">
+          <option value="Near Mint">Near Mint</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" id="pf-notes" class="form-input" placeholder="e.g. Bought at locals" />
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn-search" style="flex:1;" onclick="savePortfolioItem()">Add to Portfolio</button>
+        <button class="btn-cancel" onclick="closePortfolioAddModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Dialog ─────────────────────────────────────────── -->
+<div id="confirm-overlay" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:400px;padding:28px;">
+    <p id="confirm-message" style="font-size:14px;color:var(--text);margin-bottom:20px;line-height:1.6;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn-cancel" id="confirm-cancel">Cancel</button>
+      <button class="btn-danger" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Container ────────────────────────────────────────── -->
+<div id="toast-container" aria-live="polite"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

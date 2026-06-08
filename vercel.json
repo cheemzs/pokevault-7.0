@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/api/pokeprice", "destination": "/api/pokeprice" },
+    { "source": "/api/search",    "destination": "/api/search"    }
+  ],
+  "routes": [
+    { "src": "^/css/(.*)", "dest": "/public/css/$1" },
+    { "src": "^/js/(.*)",  "dest": "/public/js/$1"  },
+    { "src": "^/(.*)",     "dest": "/public/$1"      }
+  ]
+}

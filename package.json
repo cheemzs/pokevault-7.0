@@ -1,0 +1,9 @@
+{
+  "name": "pokevault",
+  "version": "1.0.0",
+  "description": "Pokémon card price tracker & investment portfolio — powered by PokémonPriceTracker API v2",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {}
+}
